@@ -26,8 +26,8 @@ import {{localImport (toEntityName entityName)}} from './{{toFileName fileName}}
 {{/inline}}
 {{#*inline "Constructor"}}
 {{printPropertyVisibility}}constructor(init?: Partial<{{toEntityName entityName}}>) {
-    {{#activeRecord}}super();
-    {{/activeRecord}}Object.assign(this, init);
+    {{#activeRecord}}super(init);
+    {{/activeRecord}}
 }
 {{/inline}}
 {{#*inline "Entity"}}
