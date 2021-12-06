@@ -118,20 +118,7 @@ function createIndexFile(
     });
     const rendered = compliedTemplate({ entities: databaseModel });
     const formatted = Prettier.format(rendered, prettierOptions);
-    let fileName = "index";
-    switch (generationOptions.convertCaseFile) {
-        case "camel":
-            fileName = changeCase.camelCase(fileName);
-            break;
-        case "param":
-            fileName = changeCase.paramCase(fileName);
-            break;
-        case "pascal":
-            fileName = changeCase.pascalCase(fileName);
-            break;
-        default:
-    }
-    const resultFilePath = path.resolve(entitiesPath, `${fileName}.ts`);
+    const resultFilePath = path.resolve(entitiesPath, `index.ts`);
     fs.writeFileSync(resultFilePath, formatted, {
         encoding: "utf-8",
         flag: "w",
