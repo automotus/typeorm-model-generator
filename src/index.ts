@@ -1,4 +1,7 @@
 import * as Yargs from "yargs";
+import fs = require("fs-extra");
+import inquirer = require("inquirer");
+import path = require("path");
 import { createDriver, createModelFromDatabase } from "./Engine";
 import * as TomgUtils from "./Utils";
 import IConnectionOptions, {
@@ -7,10 +10,6 @@ import IConnectionOptions, {
 import IGenerationOptions, {
     getDefaultGenerationOptions,
 } from "./IGenerationOptions";
-import fs = require("fs-extra");
-
-import inquirer = require("inquirer");
-import path = require("path");
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 CliLogic();
@@ -31,6 +30,7 @@ async function CliLogic() {
         options = await useInquirer(options);
     }
     options = validateConfig(options);
+
     const driver = createDriver(options.connectionOptions.databaseType);
     console.log(
         `[${new Date().toLocaleTimeString()}] Starting creation of model classes.`
@@ -83,6 +83,11 @@ function readTOMLConfig(options: options): {
 
     let hasUnknownProperties = false;
     if (loadedConnectionOptions) {
+        // instanceName is an optional argument without a default that can be stored in JSON.
+        // Add the undefined key here to ensure the key length check below results in true
+        if (!loadedConnectionOptions.instanceName) {
+            loadedConnectionOptions.instanceName = undefined;
+        }
         Object.keys(loadedConnectionOptions).forEach((key) => {
             if (
                 Object.prototype.hasOwnProperty.call(
@@ -121,6 +126,14 @@ function readTOMLConfig(options: options): {
             Object.keys(options.connectionOptions).length &&
         Object.keys(loadedGenerationOptions).length ===
             Object.keys(options.generationOptions).length;
+
+    // Support relative resultsPath
+    if (!path.isAbsolute(options.generationOptions.resultsPath)) {
+        options.generationOptions.resultsPath = path.resolve(
+            process.cwd(),
+            options.generationOptions.resultsPath
+        );
+    }
 
     return {
         options,

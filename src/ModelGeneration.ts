@@ -23,7 +23,7 @@ export default function modelGenerationPhase(
 
     const resultPath = generationOptions.resultsPath;
     if (!fs.existsSync(resultPath)) {
-        fs.mkdirSync(resultPath);
+        fs.mkdirSync(resultPath, { recursive: true });
     }
     let entitiesPath = resultPath;
     if (!generationOptions.noConfigs) {
@@ -34,7 +34,7 @@ export default function modelGenerationPhase(
         createTypeOrmConfig(typeormConfigPath, connectionOptions);
         entitiesPath = path.resolve(resultPath, "./entities");
         if (!fs.existsSync(entitiesPath)) {
-            fs.mkdirSync(entitiesPath);
+            fs.mkdirSync(entitiesPath, { recursive: true });
         }
     }
     if (generationOptions.indexFile) {
