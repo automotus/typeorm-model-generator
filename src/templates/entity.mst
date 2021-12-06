@@ -5,7 +5,7 @@
 import {{localImport (toEntityName entityName)}} from './{{toFileName fileName}}'
 {{/inline}}
 {{#*inline "Column"}}
-{{#generated}}@PrimaryGeneratedColumn({ type:"{{type}}", {{/generated}}{{^generated}}@Column("{{type}}",{ {{#primary}}primary:{{primary}},{{/primary}}{{/generated}}{{json options}}{{#default}},default: {{.}},{{/default}} })
+{{#generated}}@PrimaryGeneratedColumn("{{type}}", { {{/generated}}{{^generated}}@Column("{{type}}",{ {{#primary}}primary:{{primary}},{{/primary}}{{/generated}}{{json options}}{{#default}},default: {{.}},{{/default}} })
 {{printPropertyVisibility}}{{toPropertyName tscName}}{{strictMode}}:{{tscType}}{{#if options.nullable}} | null{{/if}};
 
 {{/inline}}
@@ -33,7 +33,7 @@ import {{localImport (toEntityName entityName)}} from './{{toFileName fileName}}
 {{#*inline "Entity"}}
 {{#indices}}{{> Index}}{{/indices~}}
 @Entity("{{sqlName}}"{{#schema}} ,{schema:"{{.}}"{{#if ../database}}, database:"{{../database}}"{{/if}} } {{/schema}})
-export {{defaultExport}} class {{toEntityName tscName}}{{#activeRecord}} extends BaseEntity{{/activeRecord}} {
+export {{defaultExport}} class {{toEntityName tscName}}{{#activeRecord}} extends BaseEntityDefaultParams<{{toEntityName tscName}}>{{/activeRecord}} {
 
 {{#columns}}{{> Column}}{{/columns~}}
 {{#relations}}{{> Relation}}{{/relations~}}
@@ -41,7 +41,8 @@ export {{defaultExport}} class {{toEntityName tscName}}{{#activeRecord}} extends
 {{#if generateConstructor}}{{>Constructor entityName=tscName}}{{/if~}}
 }
 {{/inline}}
-import {BaseEntity,Column,Entity,Index,JoinColumn,JoinTable,ManyToMany,ManyToOne,OneToMany,OneToOne,PrimaryColumn,PrimaryGeneratedColumn,RelationId} from "typeorm";
+import {Column,Entity,Index,JoinColumn,JoinTable,ManyToMany,ManyToOne,OneToMany,OneToOne,PrimaryColumn,PrimaryGeneratedColumn,RelationId} from "typeorm";
+import BaseEntityDefaultParams from "../utils/BaseEntityDefaultParams";
 {{#fileImports}}{{> Import}}{{/fileImports}}
 
 {{> Entity}}
