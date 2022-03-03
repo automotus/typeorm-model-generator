@@ -1,17 +1,21 @@
 module.exports = {
+  ignorePatterns: ["dist"],
   env: {
     node: true,
-    mocha: true
+    mocha: true,
   },
   extends: [
     "airbnb-base",
+    "plugin:@typescript-eslint/eslint-recommended",
     "plugin:@typescript-eslint/recommended",
+    "eslint:recommended",
     "prettier",
-    "prettier/@typescript-eslint"
+    "plugin:prettier/recommended",
+    "prettier/@typescript-eslint",
   ],
   parser: "@typescript-eslint/parser",
   parserOptions: {
-    project: "./tsconfig.json"
+    project: "./tsconfig.json",
   },
   plugins: ["@typescript-eslint"],
   rules: {
@@ -20,7 +24,7 @@ module.exports = {
     "@typescript-eslint/prefer-interface": ["off"],
     "import/no-extraneous-dependencies": [
       "error",
-      { devDependencies: ["test/**/*.ts"] }
+      { devDependencies: ["test/**/*.ts"] },
     ],
     "@typescript-eslint/no-floating-promises": ["error"],
     "no-use-before-define": ["error", "nofunc"],
@@ -33,27 +37,30 @@ module.exports = {
     "@typescript-eslint/no-explicit-any": ["off"],
     "no-loop-func": ["off"],
     "@typescript-eslint/explicit-module-boundary-types": ["off"],
-    'no-restricted-syntax': [
-      'error',
+    "no-restricted-syntax": [
+      "error",
       {
-        selector: 'ForInStatement',
-        message: 'for..in loops iterate over the entire prototype chain, which is virtually never what you want. Use Object.{keys,values,entries}, and iterate over the resulting array.',
+        selector: "ForInStatement",
+        message:
+          "for..in loops iterate over the entire prototype chain, which is virtually never what you want. Use Object.{keys,values,entries}, and iterate over the resulting array.",
       },
       {
-        selector: 'LabeledStatement',
-        message: 'Labels are a form of GOTO; using them makes code confusing and hard to maintain and understand.',
+        selector: "LabeledStatement",
+        message:
+          "Labels are a form of GOTO; using them makes code confusing and hard to maintain and understand.",
       },
       {
-        selector: 'WithStatement',
-        message: '`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
+        selector: "WithStatement",
+        message:
+          "`with` is disallowed in strict mode because it makes code impossible to predict and optimize.",
       },
     ],
   },
   settings: {
     "import/resolver": {
       node: {
-        extensions: [".ts"]
-      }
-    }
-  }
+        extensions: [".ts"],
+      },
+    },
+  },
 };
