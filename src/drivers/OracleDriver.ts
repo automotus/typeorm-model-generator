@@ -38,6 +38,20 @@ export default class OracleDriver extends AbstractDriver {
         }
     }
 
+    private static ReturnDefaultValueFunction(
+        defVal: string | null
+    ): string | undefined {
+        let defaultVal = defVal?.trim();
+        if (!defaultVal) {
+            return undefined;
+        }
+        if (defaultVal.endsWith(" ")) {
+            defaultVal = defaultVal.slice(0, -1);
+        }
+
+        return `() => "${defaultVal}"`;
+    }
+
     public async GetAllTables(
         schemas: string[],
         dbNames: string[]
@@ -47,9 +61,9 @@ export default class OracleDriver extends AbstractDriver {
                 TABLE_SCHEMA: string;
                 TABLE_NAME: string;
                 DB_NAME: string;
-            }>(
-                `SELECT NULL AS TABLE_SCHEMA, TABLE_NAME, NULL AS DB_NAME FROM all_tables WHERE owner = (select user from dual)`
-            )
+            }>(`SELECT NULL AS TABLE_SCHEMA, TABLE_NAME, NULL AS DB_NAME
+                FROM all_tables
+                WHERE owner = (SELECT USER FROM dual)`)
         ).rows!;
         const ret: Entity[] = [];
         response.forEach((val) => {
@@ -82,10 +96,14 @@ export default class OracleDriver extends AbstractDriver {
                 DATA_SCALE: number;
                 IDENTITY_COLUMN: string; // doesn't exist in old oracle versions (#195)
                 IS_UNIQUE: number;
-            }>(`SELECT utc.*, (select count(*) from USER_CONS_COLUMNS ucc
-             JOIN USER_CONSTRAINTS uc ON  uc.CONSTRAINT_NAME = ucc.CONSTRAINT_NAME and uc.CONSTRAINT_TYPE='U'
-            where ucc.column_name = utc.COLUMN_NAME AND ucc.table_name = utc.TABLE_NAME) IS_UNIQUE
-           FROM USER_TAB_COLUMNS utc`)
+            }>(`SELECT utc.*,
+                       (SELECT COUNT(*)
+                        FROM USER_CONS_COLUMNS ucc
+                                 JOIN USER_CONSTRAINTS uc
+                                      ON uc.CONSTRAINT_NAME = ucc.CONSTRAINT_NAME AND uc.CONSTRAINT_TYPE = 'U'
+                        WHERE ucc.column_name = utc.COLUMN_NAME
+                          AND ucc.table_name = utc.TABLE_NAME) IS_UNIQUE
+                FROM USER_TAB_COLUMNS utc`)
         ).rows!;
 
         entities.forEach((ent) => {
@@ -244,11 +262,17 @@ export default class OracleDriver extends AbstractDriver {
                 INDEX_NAME: string;
                 UNIQUENESS: string;
                 ISPRIMARYKEY: number;
-            }>(`SELECT ind.TABLE_NAME, ind.INDEX_NAME, col.COLUMN_NAME,ind.UNIQUENESS, CASE WHEN uc.CONSTRAINT_NAME IS NULL THEN 0 ELSE 1 END ISPRIMARYKEY
-        FROM USER_INDEXES ind
-        JOIN USER_IND_COLUMNS col ON ind.INDEX_NAME=col.INDEX_NAME
-        LEFT JOIN USER_CONSTRAINTS uc ON  uc.INDEX_NAME = ind.INDEX_NAME
-        ORDER BY col.INDEX_NAME ASC ,col.COLUMN_POSITION ASC`)
+            }>(`SELECT ind.TABLE_NAME,
+                       ind.INDEX_NAME,
+                       col.COLUMN_NAME,
+                       ind.UNIQUENESS,
+                       CASE WHEN uc.CONSTRAINT_NAME IS NULL THEN 0 ELSE 1 END ISPRIMARYKEY
+                FROM USER_INDEXES ind
+                         JOIN USER_IND_COLUMNS col ON ind.INDEX_NAME = col.INDEX_NAME
+                         LEFT JOIN USER_CONSTRAINTS uc ON uc.INDEX_NAME = ind.INDEX_NAME
+                ORDER BY
+                    col.INDEX_NAME ASC,
+                    col.COLUMN_POSITION ASC`)
         ).rows!;
 
         entities.forEach((ent) => {
@@ -293,15 +317,23 @@ export default class OracleDriver extends AbstractDriver {
                 CHILD_COLUMN_NAME: string;
                 DELETE_RULE: "RESTRICT" | "CASCADE" | "SET NULL" | "NO ACTION";
                 CONSTRAINT_NAME: string;
-            }>(`select owner.TABLE_NAME OWNER_TABLE_NAME,ownCol.POSITION OWNER_POSITION,ownCol.COLUMN_NAME OWNER_COLUMN_NAME,
-        child.TABLE_NAME CHILD_TABLE_NAME ,childCol.COLUMN_NAME CHILD_COLUMN_NAME,
-        owner.DELETE_RULE,
-        owner.CONSTRAINT_NAME
-        from user_constraints owner
-        join user_constraints child on owner.r_constraint_name=child.CONSTRAINT_NAME and child.constraint_type in ('P','U')
-        JOIN USER_CONS_COLUMNS ownCol ON owner.CONSTRAINT_NAME = ownCol.CONSTRAINT_NAME
-        JOIN USER_CONS_COLUMNS childCol ON child.CONSTRAINT_NAME = childCol.CONSTRAINT_NAME AND ownCol.POSITION=childCol.POSITION
-        ORDER BY OWNER_TABLE_NAME ASC, owner.CONSTRAINT_NAME ASC, OWNER_POSITION ASC`)
+            }>(`SELECT owner.TABLE_NAME     OWNER_TABLE_NAME,
+                       ownCol.POSITION      OWNER_POSITION,
+                       ownCol.COLUMN_NAME   OWNER_COLUMN_NAME,
+                       child.TABLE_NAME     CHILD_TABLE_NAME,
+                       childCol.COLUMN_NAME CHILD_COLUMN_NAME,
+                       owner.DELETE_RULE,
+                       owner.CONSTRAINT_NAME
+                FROM user_constraints owner
+                         JOIN user_constraints child
+                              ON owner.r_constraint_name = child.CONSTRAINT_NAME AND child.constraint_type IN ('P', 'U')
+                         JOIN USER_CONS_COLUMNS ownCol ON owner.CONSTRAINT_NAME = ownCol.CONSTRAINT_NAME
+                         JOIN USER_CONS_COLUMNS childCol ON child.CONSTRAINT_NAME = childCol.CONSTRAINT_NAME AND
+                                                            ownCol.POSITION = childCol.POSITION
+                ORDER BY
+                    OWNER_TABLE_NAME ASC,
+                    owner.CONSTRAINT_NAME ASC,
+                    OWNER_POSITION ASC`)
         ).rows!;
 
         const relationsTemp: RelationInternal[] = [] as RelationInternal[];
@@ -411,23 +443,10 @@ export default class OracleDriver extends AbstractDriver {
     }
 
     public async CheckIfDBExists(dbName: string): Promise<boolean> {
-        const { rows } = await this.Connection.execute<any>(
-            `select count(*) as CNT from dba_users where username='${dbName.toUpperCase()}'`
-        );
+        const { rows } = await this.Connection
+            .execute<any>(`SELECT COUNT(*) AS CNT
+                                                           FROM dba_users
+                                                           WHERE username = '${dbName.toUpperCase()}'`);
         return rows![0][0] > 0 || rows![0].CNT;
-    }
-
-    private static ReturnDefaultValueFunction(
-        defVal: string | null
-    ): string | undefined {
-        let defaultVal = defVal?.trim();
-        if (!defaultVal) {
-            return undefined;
-        }
-        if (defaultVal.endsWith(" ")) {
-            defaultVal = defaultVal.slice(0, -1);
-        }
-
-        return `() => "${defaultVal}"`;
     }
 }

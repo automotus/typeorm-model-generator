@@ -166,43 +166,6 @@ export default abstract class AbstractDriver {
         return retVal;
     }
 
-    public async GetDataFromServer(
-        connectionOptions: IConnectionOptions,
-        generationOptions: IGenerationOptions
-    ): Promise<Entity[]> {
-        let dbModel = [] as Entity[];
-        await this.ConnectToServer(connectionOptions);
-        dbModel = await this.GetAllTables(
-            connectionOptions.schemaNames,
-            connectionOptions.databaseNames
-        );
-        await this.GetCoulmnsFromEntity(
-            dbModel,
-            connectionOptions.schemaNames,
-            connectionOptions.databaseNames
-        );
-        await this.GetIndexesFromEntity(
-            dbModel,
-            connectionOptions.schemaNames,
-            connectionOptions.databaseNames
-        );
-        AbstractDriver.FindPrimaryColumnsFromIndexes(dbModel);
-        dbModel = await this.GetRelations(
-            dbModel,
-            connectionOptions.schemaNames,
-            connectionOptions.databaseNames,
-            generationOptions
-        );
-        await this.DisconnectFromServer();
-        dbModel = AbstractDriver.FindManyToManyRelations(dbModel);
-        dbModel = AbstractDriver.FilterGeneratedTables(
-            dbModel,
-            connectionOptions.skipTables,
-            connectionOptions.onlyTables
-        );
-        return dbModel;
-    }
-
     static FilterGeneratedTables(
         dbModel: Entity[],
         skipTables: string[],
@@ -216,15 +179,6 @@ export default abstract class AbstractDriver {
                     onlyTables.includes(table.sqlName)
             );
     }
-
-    public abstract ConnectToServer(
-        connectionOptons: IConnectionOptions
-    ): Promise<void>;
-
-    public abstract GetAllTables(
-        schemas: string[],
-        dbNames: string[]
-    ): Promise<Entity[]>;
 
     public static GetRelationsFromRelationTempInfo(
         relationsTemp: RelationInternal[],
@@ -376,25 +330,6 @@ export default abstract class AbstractDriver {
         return entities;
     }
 
-    public abstract GetCoulmnsFromEntity(
-        entities: Entity[],
-        schemas: string[],
-        dbNames: string[]
-    ): Promise<Entity[]>;
-
-    public abstract GetIndexesFromEntity(
-        entities: Entity[],
-        schemas: string[],
-        dbNames: string[]
-    ): Promise<Entity[]>;
-
-    public abstract GetRelations(
-        entities: Entity[],
-        schemas: string[],
-        dbNames: string[],
-        generationOptions: IGenerationOptions
-    ): Promise<Entity[]>;
-
     public static FindPrimaryColumnsFromIndexes(dbModel: Entity[]) {
         dbModel.forEach((entity) => {
             const primaryIndex = entity.indices.find((v) => v.primary);
@@ -423,6 +358,75 @@ export default abstract class AbstractDriver {
         });
     }
 
+    protected static buildEscapedObjectList(dbNames: string[]) {
+        return `'${dbNames.join("','")}'`;
+    }
+
+    public async GetDataFromServer(
+        connectionOptions: IConnectionOptions,
+        generationOptions: IGenerationOptions
+    ): Promise<Entity[]> {
+        let dbModel = [] as Entity[];
+        await this.ConnectToServer(connectionOptions);
+        dbModel = await this.GetAllTables(
+            connectionOptions.schemaNames,
+            connectionOptions.databaseNames
+        );
+        await this.GetCoulmnsFromEntity(
+            dbModel,
+            connectionOptions.schemaNames,
+            connectionOptions.databaseNames
+        );
+        await this.GetIndexesFromEntity(
+            dbModel,
+            connectionOptions.schemaNames,
+            connectionOptions.databaseNames
+        );
+        AbstractDriver.FindPrimaryColumnsFromIndexes(dbModel);
+        dbModel = await this.GetRelations(
+            dbModel,
+            connectionOptions.schemaNames,
+            connectionOptions.databaseNames,
+            generationOptions
+        );
+        await this.DisconnectFromServer();
+        dbModel = AbstractDriver.FindManyToManyRelations(dbModel);
+        dbModel = AbstractDriver.FilterGeneratedTables(
+            dbModel,
+            connectionOptions.skipTables,
+            connectionOptions.onlyTables
+        );
+        return dbModel;
+    }
+
+    public abstract ConnectToServer(
+        connectionOptons: IConnectionOptions
+    ): Promise<void>;
+
+    public abstract GetAllTables(
+        schemas: string[],
+        dbNames: string[]
+    ): Promise<Entity[]>;
+
+    public abstract GetCoulmnsFromEntity(
+        entities: Entity[],
+        schemas: string[],
+        dbNames: string[]
+    ): Promise<Entity[]>;
+
+    public abstract GetIndexesFromEntity(
+        entities: Entity[],
+        schemas: string[],
+        dbNames: string[]
+    ): Promise<Entity[]>;
+
+    public abstract GetRelations(
+        entities: Entity[],
+        schemas: string[],
+        dbNames: string[],
+        generationOptions: IGenerationOptions
+    ): Promise<Entity[]>;
+
     public abstract DisconnectFromServer(): Promise<void>;
 
     public abstract CreateDB(dbName: string): Promise<void>;
@@ -430,8 +434,4 @@ export default abstract class AbstractDriver {
     public abstract DropDB(dbName: string): Promise<void>;
 
     public abstract CheckIfDBExists(dbName: string): Promise<boolean>;
-
-    protected static buildEscapedObjectList(dbNames: string[]) {
-        return `'${dbNames.join("','")}'`;
-    }
 }

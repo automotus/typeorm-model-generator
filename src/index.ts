@@ -44,6 +44,7 @@ async function CliLogic() {
         `[${new Date().toLocaleTimeString()}] Typeorm model classes created.`
     );
 }
+
 function validateConfig(options: options): options {
     if (
         options.generationOptions.lazy &&
@@ -57,6 +58,7 @@ function validateConfig(options: options): options {
     }
     return options;
 }
+
 function makeDefaultConfigs() {
     const generationOptions = getDefaultGenerationOptions();
     const connectionOptions = getDefaultConnectionOptions();
@@ -65,6 +67,7 @@ function makeDefaultConfigs() {
         connectionOptions,
     };
 }
+
 function readTOMLConfig(options: options): {
     options;
     fullConfigFile: boolean;
@@ -140,6 +143,7 @@ function readTOMLConfig(options: options): {
         fullConfigFile,
     };
 }
+
 function checkYargsParameters(options: options): options {
     const { argv } = Yargs.usage(
         "Usage: typeorm-model-generator -h <host> -d <database> -p [port] -u <user> -x [password] -e [engine]\nYou can also run program without specifying any parameters."

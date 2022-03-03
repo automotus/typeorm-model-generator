@@ -39,6 +39,30 @@ export default class MysqlDriver extends AbstractDriver {
         }
     }
 
+    private static ReturnDefaultValueFunction(
+        defVal: string | undefined,
+        dataType: string
+    ): string | undefined {
+        let defaultValue = defVal;
+        if (!defaultValue || defaultValue === "NULL") {
+            return undefined;
+        }
+        if (defaultValue.toLowerCase() === "current_timestamp()") {
+            defaultValue = "CURRENT_TIMESTAMP";
+        }
+        if (
+            defaultValue === "CURRENT_TIMESTAMP" ||
+            defaultValue.startsWith(`'`)
+        ) {
+            return `() => "${defaultValue}"`;
+        }
+        if (dataType === "set") {
+            return `() => ['${defaultValue.split(",").join("','")}']`;
+        }
+
+        return `() => "'${defaultValue}'"`;
+    }
+
     public async GetAllTables(
         schemas: string[],
         dbNames: string[]
@@ -47,14 +71,13 @@ export default class MysqlDriver extends AbstractDriver {
             TABLE_SCHEMA: string;
             TABLE_NAME: string;
             DB_NAME: string;
-        }[] = await this.ExecQuery(
-            `SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_SCHEMA as DB_NAME
+        }[] = await this
+            .ExecQuery(`SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_SCHEMA as DB_NAME
                         FROM information_schema.tables
                         WHERE table_type='BASE TABLE'
                         AND table_schema IN (${MysqlDriver.buildEscapedObjectList(
                             dbNames
-                        )})`
-        );
+                        )})`);
         // const response = await this.GetAllTablesQuery(schemas, dbNames);
         const ret: Entity[] = [] as Entity[];
         response.forEach((val) => {
@@ -373,15 +396,13 @@ export default class MysqlDriver extends AbstractDriver {
         generationOptions: IGenerationOptions
     ): Promise<Entity[]> {
         const response = await this.ExecQuery<{
-            TableWithForeignKey: string;
-            // eslint-disable-next-line camelcase
+            TableWithForeignKey: string; // eslint-disable-next-line camelcase
             FK_PartNo: number;
             ForeignKeyColumn: string;
             TableReferenced: string;
             ForeignKeyColumnReferenced: string;
             onDelete: "RESTRICT" | "CASCADE" | "SET NULL" | "NO_ACTION";
-            onUpdate: "RESTRICT" | "CASCADE" | "SET NULL" | "NO_ACTION";
-            // eslint-disable-next-line camelcase
+            onUpdate: "RESTRICT" | "CASCADE" | "SET NULL" | "NO_ACTION"; // eslint-disable-next-line camelcase
             object_id: string;
         }>(`SELECT
             CU.TABLE_NAME TableWithForeignKey,
@@ -554,29 +575,5 @@ export default class MysqlDriver extends AbstractDriver {
         });
         await promise;
         return ret;
-    }
-
-    private static ReturnDefaultValueFunction(
-        defVal: string | undefined,
-        dataType: string
-    ): string | undefined {
-        let defaultValue = defVal;
-        if (!defaultValue || defaultValue === "NULL") {
-            return undefined;
-        }
-        if (defaultValue.toLowerCase() === "current_timestamp()") {
-            defaultValue = "CURRENT_TIMESTAMP";
-        }
-        if (
-            defaultValue === "CURRENT_TIMESTAMP" ||
-            defaultValue.startsWith(`'`)
-        ) {
-            return `() => "${defaultValue}"`;
-        }
-        if (dataType === "set") {
-            return `() => ['${defaultValue.split(",").join("','")}']`;
-        }
-
-        return `() => "'${defaultValue}'"`;
     }
 }

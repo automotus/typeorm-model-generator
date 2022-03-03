@@ -13,8 +13,7 @@ export type Entity = {
     columns: Column[];
     relationIds: RelationId[];
     relations: Relation[];
-    indices: Index[];
-    // TODO: move to sub-object or use handlebars helpers(?)
+    indices: Index[]; // TODO: move to sub-object or use handlebars helpers(?)
     fileName: string;
     fileImports: {
         entityName: string;

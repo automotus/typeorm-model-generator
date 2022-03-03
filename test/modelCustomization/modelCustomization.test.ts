@@ -23,36 +23,38 @@ describe("Model customization phase", async () => {
                     options: { name: "id" },
                     tscName: "id",
                     tscType: "number",
-                    primary: true
+                    primary: true,
                 },
                 {
                     type: "character varying",
                     options: { name: "name" },
                     tscName: "name",
-                    tscType: "string"
+                    tscType: "string",
                 },
                 {
                     type: "character varying",
                     options: { name: "complicatedName" },
                     tscName: "complexName",
-                    tscType: "string"
-                }
+                    tscType: "string",
+                },
             ],
             indices: [
                 {
                     columns: ["id"],
                     options: { unique: true },
                     name: "PK_6571d08cfb2f1ab06c3aab425a6",
-                    primary: true
-                }
+                    primary: true,
+                },
             ],
             relations: [
                 {
                     fieldName: "Post",
+                    schemaName: "public",
+                    relatedSchema: "public",
                     relatedField: "authorId",
                     relatedTable: "Post",
-                    relationType: "OneToMany"
-                }
+                    relationType: "OneToMany",
+                },
             ],
             relationIds: [],
             sqlName: "PostAuthor",
@@ -60,7 +62,7 @@ describe("Model customization phase", async () => {
             fileName: "PostAuthor",
             database: "",
             schema: "public",
-            fileImports: []
+            fileImports: [],
         },
         {
             columns: [
@@ -70,44 +72,46 @@ describe("Model customization phase", async () => {
                     options: { name: "id" },
                     tscName: "id",
                     tscType: "number",
-                    primary: true
+                    primary: true,
                 },
                 {
                     type: "character varying",
                     options: { name: "title" },
                     tscName: "title",
-                    tscType: "string"
+                    tscType: "string",
                 },
                 {
                     type: "character varying",
                     options: { name: "text" },
                     tscName: "text",
-                    tscType: "string"
-                }
+                    tscType: "string",
+                },
             ],
             indices: [
                 {
                     columns: ["authorId"],
                     options: { unique: true },
-                    name: "REL_cef8d6e8edb69c82e5f10bb402"
+                    name: "REL_cef8d6e8edb69c82e5f10bb402",
                 },
                 {
                     columns: ["id"],
                     options: { unique: true },
                     name: "PK_c4d3b3dcd73db0b0129ea829f9f",
-                    primary: true
-                }
+                    primary: true,
+                },
             ],
             relations: [
                 {
+                    schemaName: "public",
                     fieldName: "authorId",
                     relatedField: "Post",
                     joinColumnOptions: [
-                        { name: "authorId", referencedColumnName: "id" }
+                        { name: "authorId", referencedColumnName: "id" },
                     ],
+                    relatedSchema: "public",
                     relatedTable: "PostAuthor",
-                    relationType: "ManyToOne"
-                }
+                    relationType: "ManyToOne",
+                },
             ],
             relationIds: [],
             sqlName: "Post",
@@ -115,8 +119,8 @@ describe("Model customization phase", async () => {
             fileName: "Post",
             database: "",
             schema: "public",
-            fileImports: []
-        }
+            fileImports: [],
+        },
     ];
 
     const resultsPath = path.resolve(process.cwd(), `output`);
@@ -319,7 +323,7 @@ describe("Model customization phase", async () => {
             expect(postAuthorContent).to.contain("posts: Post[];");
             expect(postAuthorContent).to.contain("complex_name: string;");
 
-            compileGeneratedModel(generationOptions.resultsPath, [""],false);
+            compileGeneratedModel(generationOptions.resultsPath, [""], false);
         });
     });
     describe("EOL", async () => {

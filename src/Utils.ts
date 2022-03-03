@@ -22,9 +22,11 @@ export function LogError(
         console.error(errObject);
     }
 }
+
 export function packageVersion(): string {
     return `${packagejson.name}@${packagejson.version}`;
 }
+
 export function findNameForNewField(
     _fieldName: string,
     entity: Entity,
@@ -80,6 +82,7 @@ export function requireLocalFile(fileName: string): any {
         throw err;
     }
 }
+
 export function assertUnreachable(x: never): never {
     throw new Error("Didn't expect to get here");
 }

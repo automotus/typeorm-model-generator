@@ -267,6 +267,7 @@ function createTsConfigFile(tsconfigPath: string): void {
         flag: "w",
     });
 }
+
 function createTypeOrmConfig(
     typeormConfigPath: string,
     connectionOptions: IConnectionOptions

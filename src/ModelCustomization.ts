@@ -95,6 +95,7 @@ export default function modelCustomizationPhase(
     retVal = removeColumnDefaultProperties(retVal, defaultValues);
     return retVal;
 }
+
 function removeIndicesGeneratedByTypeorm(dbModel: Entity[]): Entity[] {
     // TODO: Support typeorm CustomNamingStrategy
     const namingStrategy = new DefaultNamingStrategy();
@@ -139,6 +140,7 @@ function removeIndicesGeneratedByTypeorm(dbModel: Entity[]): Entity[] {
     });
     return dbModel;
 }
+
 function removeColumnsInRelation(dbModel: Entity[]): Entity[] {
     dbModel.forEach((entity) => {
         entity.columns = entity.columns.filter(
@@ -153,6 +155,7 @@ function removeColumnsInRelation(dbModel: Entity[]): Entity[] {
     });
     return dbModel;
 }
+
 function removeColumnDefaultProperties(
     dbModel: Entity[],
     defaultValues: DataTypeDefaults
@@ -204,8 +207,8 @@ function findFileImports(dbModel: Entity[]) {
                     (v) => v.entityName === relation.relatedTable
                 )
             ) {
-                let relatedTable = dbModel.find(
-                    (related) => related.tscName == relation.relatedTable
+                const relatedTable = dbModel.find(
+                    (related) => related.tscName === relation.relatedTable
                 )!;
                 entity.fileImports.push({
                     entityName: relatedTable.tscName,
@@ -296,12 +299,15 @@ function applyNamingStrategy(
                     oldName
                 );
 
-                const relatedEntity = model.find(
-                    (v) => v.tscName === relation.relatedTable
-                )!;
-                const relation2 = relatedEntity.relations.find(
-                    (v) => v.fieldName === relation.relatedField
-                )!;
+                const relatedEntity = model.find((v) => {
+                    return (
+                        v.tscName === relation.relatedTable &&
+                        v.schema === relation.relatedSchema
+                    );
+                })!;
+                const relation2 = relatedEntity.relations.find((v) => {
+                    return v.fieldName === relation.relatedField;
+                })!;
 
                 entity.relationIds
                     .filter((v) => v.relationField === oldName)
@@ -345,12 +351,16 @@ function applyNamingStrategy(
         });
         return model;
     }
+
     function changeEntityNames(entities: Entity[]): Entity[] {
         entities.forEach((entity) => {
             const newName = namingStrategy.entityName(entity.tscName, entity);
             entities.forEach((entity2) => {
                 entity2.relations.forEach((relation) => {
-                    if (relation.relatedTable === entity.tscName) {
+                    if (
+                        relation.relatedTable === entity.tscName &&
+                        relation.relatedSchema === entity.schema
+                    ) {
                         relation.relatedTable = newName;
                     }
                 });
@@ -360,6 +370,7 @@ function applyNamingStrategy(
         });
         return entities;
     }
+
     function changeFileNames(entities: Entity[]): Entity[] {
         entities.forEach((entity) => {
             entity.fileName = namingStrategy.fileName(entity.fileName);

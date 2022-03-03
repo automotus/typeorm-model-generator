@@ -37,7 +37,8 @@
     "reflect-metadata": "^0.1.13",
     "sqlite3": "^5.0.2",
     "typeorm": "^0.2.37",
-    "yargs": "^16.2.0"
+    "yargs": "^16.2.0",
+    "prettier": "^2.5.1"
   },
   "devDependencies": {
     "@types/array.prototype.flatmap": "^1.2.2",
@@ -78,7 +79,6 @@
     "mocha": "^8.4.0",
     "ncp": "^2.0.0",
     "nyc": "^15.1.0",
-    "prettier": "^2.5.1",
     "rimraf": "^3.0.2",
     "sinon": "^9.2.4",
     "sinon-chai": "^3.7.0",

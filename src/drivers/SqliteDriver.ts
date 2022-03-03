@@ -22,6 +22,8 @@ export default class SqliteDriver extends AbstractDriver {
 
     public readonly standardSchema = "";
 
+    public GetAllTablesQuery: any;
+
     private sqliteLib: typeof sqliteLib;
 
     private sqlite: sqliteLib.sqlite3;
@@ -29,8 +31,6 @@ export default class SqliteDriver extends AbstractDriver {
     private db: sqliteLib.Database;
 
     private tablesWithGeneratedPrimaryKey: string[] = new Array<string>();
-
-    public GetAllTablesQuery: any;
 
     public constructor() {
         super();
@@ -44,10 +44,19 @@ export default class SqliteDriver extends AbstractDriver {
         }
     }
 
+    private static ReturnDefaultValueFunction(
+        defVal: string | null
+    ): string | undefined {
+        if (!defVal) {
+            return undefined;
+        }
+
+        return `() => "${defVal}"`;
+    }
+
     public async GetAllTables(
         /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-        schemas: string[],
-        /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+        schemas: string[] /* eslint-disable-next-line @typescript-eslint/no-unused-vars */,
         dbNames: string[]
     ): Promise<Entity[]> {
         const ret: Entity[] = [] as Entity[];
@@ -80,8 +89,7 @@ export default class SqliteDriver extends AbstractDriver {
                     cid: number;
                     name: string;
                     type: string;
-                    notnull: number;
-                    // eslint-disable-next-line camelcase
+                    notnull: number; // eslint-disable-next-line camelcase
                     dflt_value: string;
                     pk: number;
                 }>(`PRAGMA table_info('${ent.tscName}');`);
@@ -322,14 +330,12 @@ export default class SqliteDriver extends AbstractDriver {
                     seq: number;
                     table: string;
                     from: string;
-                    to: string;
-                    // eslint-disable-next-line camelcase
+                    to: string; // eslint-disable-next-line camelcase
                     on_update:
                         | "RESTRICT"
                         | "CASCADE"
                         | "SET NULL"
-                        | "NO ACTION";
-                    // eslint-disable-next-line camelcase
+                        | "NO ACTION"; // eslint-disable-next-line camelcase
                     on_delete:
                         | "RESTRICT"
                         | "CASCADE"
@@ -447,15 +453,5 @@ export default class SqliteDriver extends AbstractDriver {
         });
         await promise;
         return ret;
-    }
-
-    private static ReturnDefaultValueFunction(
-        defVal: string | null
-    ): string | undefined {
-        if (!defVal) {
-            return undefined;
-        }
-
-        return `() => "${defVal}"`;
     }
 }

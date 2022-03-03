@@ -37,6 +37,20 @@ export default class MssqlDriver extends AbstractDriver {
         }
     }
 
+    private static ReturnDefaultValueFunction(
+        defVal: string | null
+    ): string | undefined {
+        let defaultValue = defVal;
+        if (!defaultValue) {
+            return undefined;
+        }
+        if (defaultValue.startsWith("(") && defaultValue.endsWith(")")) {
+            defaultValue = defaultValue.slice(1, -1);
+        }
+
+        return `() => "${defaultValue}"`;
+    }
+
     public async GetAllTables(
         schemas: string[],
         dbNames: string[]
@@ -47,14 +61,15 @@ export default class MssqlDriver extends AbstractDriver {
             TABLE_NAME: string;
             DB_NAME: string;
         }[] = (
-            await request.query(
-                `SELECT TABLE_SCHEMA,TABLE_NAME, table_catalog as "DB_NAME" FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_TYPE='BASE TABLE' and TABLE_SCHEMA in (${MssqlDriver.buildEscapedObjectList(
-            schemas
-        )}) AND TABLE_CATALOG in (${MssqlDriver.buildEscapedObjectList(
-                    dbNames
-                )})`
-            )
+            await request.query(`SELECT TABLE_SCHEMA, TABLE_NAME, table_catalog AS DB_NAME
+                                    FROM INFORMATION_SCHEMA.TABLES
+                                    WHERE TABLE_TYPE = 'BASE TABLE'
+                                      AND TABLE_SCHEMA IN (${MssqlDriver.buildEscapedObjectList(
+                                          schemas
+                                      )})
+                                      AND TABLE_CATALOG IN (${MssqlDriver.buildEscapedObjectList(
+                                          dbNames
+                                      )})`)
         ).recordset;
         // const response = await this.GetAllTablesQuery(schemas, dbNames);
         const ret: Entity[] = [] as Entity[];
@@ -94,18 +109,30 @@ export default class MssqlDriver extends AbstractDriver {
             IsIdentity: number;
             IsUnique: number;
         }[] = (
-            await request.query(`SELECT c.TABLE_NAME,c.TABLE_SCHEMA,c.COLUMN_NAME,c.COLUMN_DEFAULT,IS_NULLABLE, DATA_TYPE,CHARACTER_MAXIMUM_LENGTH,NUMERIC_PRECISION,NUMERIC_SCALE,
-            COLUMNPROPERTY(object_id(c.TABLE_SCHEMA + '.'+ c.TABLE_NAME),c. COLUMN_NAME, 'IsIdentity') IsIdentity,
-             CASE WHEN ISNULL(tc.cnt,0)>0 THEN 1 ELSE 0 END AS IsUnique
-              FROM INFORMATION_SCHEMA.COLUMNS c
-              LEFT JOIN (SELECT tc.TABLE_SCHEMA,tc.TABLE_NAME,cu.COLUMN_NAME,COUNT(1) AS cnt FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc inner join INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cu on cu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME where tc.CONSTRAINT_TYPE = 'UNIQUE' GROUP BY tc.TABLE_SCHEMA,tc.TABLE_NAME,cu.COLUMN_NAME) AS tc
-               on tc.TABLE_NAME = c.TABLE_NAME and tc.COLUMN_NAME = c.COLUMN_NAME and tc.TABLE_SCHEMA=c.TABLE_SCHEMA
-              where c.TABLE_SCHEMA in (${MssqlDriver.buildEscapedObjectList(
-                  schemas
-              )}) AND c.TABLE_CATALOG in (${MssqlDriver.buildEscapedObjectList(
-                dbNames
-            )}) order by ordinal_position
-        `)
+            await request.query(`SELECT c.TABLE_NAME,
+                                           c.TABLE_SCHEMA,
+                                           c.COLUMN_NAME,
+                                           c.COLUMN_DEFAULT,
+                                           IS_NULLABLE,
+                                           DATA_TYPE,
+                                           CHARACTER_MAXIMUM_LENGTH,
+                                           NUMERIC_PRECISION,
+                                           NUMERIC_SCALE,
+                                           COLUMNPROPERTY(object_id(c.TABLE_SCHEMA + '.' + c.TABLE_NAME), c.COLUMN_NAME,
+                                                          'IsIdentity') IsIdentity,
+                                           CASE WHEN ISNULL(tc.cnt,0)>0 THEN 1 ELSE 0 END AS IsUnique
+                                    FROM INFORMATION_SCHEMA.COLUMNS C
+                                        LEFT JOIN (SELECT tc.TABLE_SCHEMA, tc.TABLE_NAME, cu.COLUMN_NAME, COUNT(1) AS cnt FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc INNER JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cu ON cu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME WHERE tc.CONSTRAINT_TYPE = 'UNIQUE' GROUP BY tc.TABLE_SCHEMA, tc.TABLE_NAME, cu.COLUMN_NAME) AS tc
+                                    ON tc.TABLE_NAME = C.TABLE_NAME AND tc.COLUMN_NAME = C.COLUMN_NAME AND tc.TABLE_SCHEMA= C.TABLE_SCHEMA
+                                    WHERE C.TABLE_SCHEMA IN (${MssqlDriver.buildEscapedObjectList(
+                                        schemas
+                                    )})
+                                      AND C.TABLE_CATALOG IN (${MssqlDriver.buildEscapedObjectList(
+                                          dbNames
+                                      )})
+                                    ORDER BY
+                                        ordinal_position
+            `)
         ).recordset;
         entities.forEach((ent) => {
             response
@@ -291,29 +318,32 @@ export default class MssqlDriver extends AbstractDriver {
                 await this.UseDB(dbName);
             }
             const resp = (
-                await request.query(`SELECT
-                TableName = t.name,
-                TableSchema = s.name,
-                IndexName = ind.name,
-                ColumnName = col.name,
-                ind.is_unique,
-                ind.is_primary_key
-                FROM
-                sys.indexes ind
-                INNER JOIN
-                sys.index_columns ic ON  ind.object_id = ic.object_id and ind.index_id = ic.index_id
-                INNER JOIN
-                sys.columns col ON ic.object_id = col.object_id and ic.column_id = col.column_id
-                INNER JOIN
-                sys.tables t ON ind.object_id = t.object_id
-                INNER JOIN
-                sys.schemas s on s.schema_id=t.schema_id
-                WHERE
-                t.is_ms_shipped = 0 and s.name in (${MssqlDriver.buildEscapedObjectList(
-                    schemas
-                )})
-                    ORDER BY
-                    t.name, ind.name, ind.index_id, ic.key_ordinal;`)
+                await request.query(`SELECT TableName = t.name,
+                                                      TableSchema = s.name,
+                                                      IndexName = ind.name,
+                                                      ColumnName = col.name,
+                                                      ind.is_unique,
+                                                      ind.is_primary_key
+                                               FROM sys.indexes ind
+                                                        INNER JOIN
+                                                    sys.index_columns ic
+                                                    ON ind.object_id = ic.object_id AND ind.index_id = ic.index_id
+                                                        INNER JOIN
+                                                    sys.columns col
+                                                    ON ic.object_id = col.object_id AND ic.column_id = col.column_id
+                                                        INNER JOIN
+                                                    sys.tables t ON ind.object_id = t.object_id
+                                                        INNER JOIN
+                                                    sys.schemas s ON s.schema_id = t.schema_id
+                                               WHERE t.is_ms_shipped = 0
+                                                 AND s.name IN (${MssqlDriver.buildEscapedObjectList(
+                                                     schemas
+                                                 )})
+                                               ORDER BY
+                                                   t.name,
+                                                   ind.name,
+                                                   ind.index_id,
+                                                   ic.key_ordinal;`)
             ).recordset;
             response.push(...resp);
         }
@@ -355,8 +385,7 @@ export default class MssqlDriver extends AbstractDriver {
     ): Promise<Entity[]> {
         const request = new this.MSSQL.Request(this.Connection);
         const response: {
-            TableWithForeignKey: string;
-            // eslint-disable-next-line camelcase
+            TableWithForeignKey: string; // eslint-disable-next-line camelcase
             FK_PartNo: number;
             ForeignKeyColumn: string;
             TableReferenced: string;
@@ -371,8 +400,7 @@ export default class MssqlDriver extends AbstractDriver {
                 await this.UseDB(dbName);
             }
             const resp: {
-                TableWithForeignKey: string;
-                // eslint-disable-next-line camelcase
+                TableWithForeignKey: string; // eslint-disable-next-line camelcase
                 FK_PartNo: number;
                 ForeignKeyColumn: string;
                 TableReferenced: string;
@@ -381,35 +409,41 @@ export default class MssqlDriver extends AbstractDriver {
                 onUpdate: "RESTRICT" | "CASCADE" | "SET_NULL" | "NO_ACTION";
                 objectId: number;
             }[] = (
-                await request.query(`select
-                parentTable.name as TableWithForeignKey,
-                fkc.constraint_column_id as FK_PartNo,
-                parentColumn.name as ForeignKeyColumn,
-                referencedTable.name as TableReferenced,
-                referencedColumn.name as ForeignKeyColumnReferenced,
-                fk.delete_referential_action_desc as onDelete,
-                fk.update_referential_action_desc as onUpdate,
-                fk.object_id as objectId
-                from
-                sys.foreign_keys fk
-                inner join
-                sys.foreign_key_columns as fkc on fkc.constraint_object_id=fk.object_id
-                inner join
-                sys.tables as parentTable on fkc.parent_object_id = parentTable.object_id
-                inner join
-                sys.columns as parentColumn on fkc.parent_object_id = parentColumn.object_id and fkc.parent_column_id = parentColumn.column_id
-                inner join
-                sys.tables as referencedTable on fkc.referenced_object_id = referencedTable.object_id
-                inner join
-                sys.columns as referencedColumn on fkc.referenced_object_id = referencedColumn.object_id and fkc.referenced_column_id = referencedColumn.column_id
-                inner join
-                sys.schemas as parentSchema on parentSchema.schema_id=parentTable.schema_id
-                where
-                fk.is_disabled=0 and fk.is_ms_shipped=0 and parentSchema.name in (${MssqlDriver.buildEscapedObjectList(
-                    schemas
-                )})
-                    order by
-                    TableWithForeignKey, FK_PartNo`)
+                await request.query(`SELECT parentTable.name                  AS TableWithForeignKey,
+                                               fkc.constraint_column_id          AS FK_PartNo,
+                                               parentColumn.name                 AS ForeignKeyColumn,
+                                               referencedTable.name              AS TableReferenced,
+                                               referencedColumn.name             AS ForeignKeyColumnReferenced,
+                                               fk.delete_referential_action_desc AS onDelete,
+                                               fk.update_referential_action_desc AS onUpdate,
+                                               fk.object_id                      AS objectId
+                                        FROM sys.foreign_keys fk
+                                                 INNER JOIN
+                                             sys.foreign_key_columns AS fkc ON fkc.constraint_object_id = fk.object_id
+                                                 INNER JOIN
+                                             sys.tables AS parentTable ON fkc.parent_object_id = parentTable.object_id
+                                                 INNER JOIN
+                                             sys.columns AS parentColumn
+                                             ON fkc.parent_object_id = parentColumn.object_id AND
+                                                fkc.parent_column_id = parentColumn.column_id
+                                                 INNER JOIN
+                                             sys.tables AS referencedTable
+                                             ON fkc.referenced_object_id = referencedTable.object_id
+                                                 INNER JOIN
+                                             sys.columns AS referencedColumn
+                                             ON fkc.referenced_object_id = referencedColumn.object_id AND
+                                                fkc.referenced_column_id = referencedColumn.column_id
+                                                 INNER JOIN
+                                             sys.schemas AS parentSchema
+                                             ON parentSchema.schema_id = parentTable.schema_id
+                                        WHERE fk.is_disabled = 0
+                                          AND fk.is_ms_shipped = 0
+                                          AND parentSchema.name IN (${MssqlDriver.buildEscapedObjectList(
+                                              schemas
+                                          )})
+                                        ORDER BY
+                                            TableWithForeignKey,
+                                            FK_PartNo`)
             ).recordset;
             response.push(...resp);
         }
@@ -531,23 +565,9 @@ export default class MssqlDriver extends AbstractDriver {
 
     public async CheckIfDBExists(dbName: string): Promise<boolean> {
         const request = new this.MSSQL.Request(this.Connection);
-        const resp = await request.query(
-            `SELECT name FROM master.sys.databases WHERE name = N'${dbName}' `
-        );
+        const resp = await request.query(`SELECT name
+                                          FROM master.sys.databases
+                                          WHERE name = N'${dbName}' `);
         return resp.recordset.length > 0;
-    }
-
-    private static ReturnDefaultValueFunction(
-        defVal: string | null
-    ): string | undefined {
-        let defaultValue = defVal;
-        if (!defaultValue) {
-            return undefined;
-        }
-        if (defaultValue.startsWith("(") && defaultValue.endsWith(")")) {
-            defaultValue = defaultValue.slice(1, -1);
-        }
-
-        return `() => "${defaultValue}"`;
     }
 }
