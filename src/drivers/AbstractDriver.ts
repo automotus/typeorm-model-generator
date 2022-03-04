@@ -76,8 +76,8 @@ export default abstract class AbstractDriver {
                     (v) =>
                         v.joinColumnOptions && v.relationType !== "ManyToMany"
                 ) &&
-                entity.relations[0].relatedTable !==
-                    entity.relations[1].relatedTable &&
+                `${entity.relations[0].relatedTable}${entity.relations[0].relatedSchema}` !==
+                    `${entity.relations[1].relatedTable}${entity.relations[1].relatedSchema}` &&
                 entity.relations[0].joinColumnOptions!.length ===
                     entity.relations[1].joinColumnOptions!.length &&
                 entity.columns.length ===
@@ -95,24 +95,38 @@ export default abstract class AbstractDriver {
                     ).length === 0
         );
         manyToManyEntities.forEach((junctionEntity) => {
-            const firstEntity = dbModel.find(
-                (v) => v.tscName === junctionEntity.relations[0].relatedTable
-            )!;
-            const secondEntity = dbModel.find(
-                (v) => v.tscName === junctionEntity.relations[1].relatedTable
-            )!;
+            const firstEntity = dbModel.find((v) => {
+                return (
+                    v.tscName === junctionEntity.relations[0].relatedTable &&
+                    v.schema === junctionEntity.relations[0].relatedSchema
+                );
+            })!;
+            const secondEntity = dbModel.find((v) => {
+                return (
+                    v.tscName === junctionEntity.relations[1].relatedTable &&
+                    v.schema === junctionEntity.relations[1].relatedSchema
+                );
+            })!;
 
-            const firstRelation = firstEntity.relations.find(
-                (v) => v.relatedTable === junctionEntity.tscName
-            )!;
-            const secondRelation = secondEntity.relations.find(
-                (v) => v.relatedTable === junctionEntity.tscName
-            )!;
+            const firstRelation = firstEntity.relations.find((v) => {
+                return (
+                    v.relatedTable === junctionEntity.tscName &&
+                    v.relatedSchema === junctionEntity.schema
+                );
+            })!;
+            const secondRelation = secondEntity.relations.find((v) => {
+                return (
+                    v.relatedTable === junctionEntity.tscName &&
+                    v.relatedSchema === junctionEntity.schema
+                );
+            })!;
 
             firstRelation.relationType = "ManyToMany";
             secondRelation.relationType = "ManyToMany";
             firstRelation.relatedTable = secondEntity.tscName;
+            firstRelation.relatedSchema = secondEntity.schema;
             secondRelation.relatedTable = firstEntity.tscName;
+            secondRelation.relatedSchema = firstEntity.schema;
 
             firstRelation.fieldName = TomgUtils.findNameForNewField(
                 secondEntity.tscName,
@@ -186,18 +200,24 @@ export default abstract class AbstractDriver {
         generationOptions: IGenerationOptions
     ) {
         relationsTemp.forEach((relationTmp) => {
-            const ownerEntity = entities.find(
-                (entity) => entity.tscName === relationTmp.ownerTable.tscName
-            );
+            const ownerEntity = entities.find((entity) => {
+                return (
+                    entity.tscName === relationTmp.ownerTable.tscName &&
+                    entity.schema === relationTmp.ownerTable.schema
+                );
+            });
             if (!ownerEntity) {
                 TomgUtils.LogError(
                     `Relation between tables ${relationTmp.ownerTable.sqlName} and ${relationTmp.relatedTable.sqlName} didn't found entity model ${relationTmp.ownerTable.sqlName}.`
                 );
                 return;
             }
-            const referencedEntity = entities.find(
-                (entity) => entity.tscName === relationTmp.relatedTable.tscName
-            );
+            const referencedEntity = entities.find((entity) => {
+                return (
+                    entity.tscName === relationTmp.relatedTable.tscName &&
+                    entity.schema === relationTmp.relatedTable.schema
+                );
+            });
             if (!referencedEntity) {
                 TomgUtils.LogError(
                     `Relation between tables ${relationTmp.ownerTable.sqlName} and ${relationTmp.relatedTable.sqlName} didn't found entity model ${relationTmp.relatedTable.sqlName}.`
@@ -275,6 +295,7 @@ export default abstract class AbstractDriver {
 
             const ownerRelation: Relation = {
                 fieldName,
+                schemaName: relationTmp.ownerTable.schema,
                 relatedField: TomgUtils.findNameForNewField(
                     relationTmp.ownerTable.tscName,
                     relationTmp.relatedTable
@@ -286,6 +307,7 @@ export default abstract class AbstractDriver {
                     };
                     return retVal;
                 }),
+                relatedSchema: relationTmp.relatedTable.schema,
                 relatedTable: relationTmp.relatedTable.tscName,
                 relationType: isOneToMany ? "ManyToOne" : "OneToOne",
             };
@@ -294,8 +316,10 @@ export default abstract class AbstractDriver {
             }
             const relatedRelation: Relation = {
                 fieldName: ownerRelation.relatedField,
+                schemaName: ownerRelation.relatedSchema,
                 relatedField: ownerRelation.fieldName,
                 relatedTable: relationTmp.ownerTable.tscName,
+                relatedSchema: relationTmp.ownerTable.schema,
                 relationType: isOneToMany ? "OneToMany" : "OneToOne",
             };
 

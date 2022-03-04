@@ -1,5 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars */
 import { plural } from "pluralize";
+import * as changeCase from "change-case";
 import { Relation } from "./models/Relation";
 import { RelationId } from "./models/RelationId";
 import { Entity } from "./models/Entity";
@@ -66,6 +67,9 @@ export function relationName(relation: Relation, owner?: Entity): string {
 }
 
 export function entityName(oldEntityName: string, entity?: Entity): string {
+    if (entity) {
+        return entity.schema + changeCase.capitalCase(oldEntityName);
+    }
     return oldEntityName;
 }
 

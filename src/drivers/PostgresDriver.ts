@@ -11,6 +11,55 @@ import { Index } from "../models/Index";
 import IGenerationOptions from "../IGenerationOptions";
 import { RelationInternal } from "../models/RelationInternal";
 
+export interface GetAllTablesResponse {
+    // eslint-disable-next-line camelcase
+    table_schema: string;
+    // eslint-disable-next-line camelcase
+    table_name: string;
+    // eslint-disable-next-line camelcase
+    db_name: string;
+}
+
+export interface GetCoulmnsFromEntityResponse {
+    /* eslint-disable camelcase */
+    table_schema: string;
+    table_name: string;
+    column_name: string;
+    udt_name: string;
+    column_default: string;
+    is_nullable: string;
+    data_type: string;
+    character_maximum_length: number;
+    numeric_precision: number;
+    numeric_scale: number;
+    isidentity: string; // SERIAL identity type
+    is_identity: string; // reccommended INDENTITY type for pg > 10
+    isunique: string;
+    enumvalues: string | null /* eslint-enable camelcase */;
+}
+
+export interface GetIndexesFromEntityResponse {
+    tablename: string;
+    indexname: string;
+    columnname: string; // eslint-disable-next-line camelcase
+    is_unique: number; // eslint-disable-next-line camelcase
+    is_primary_key: number;
+}
+
+export interface GetRelationsResponse {
+    tablewithforeignkey: string;
+    schemawithforeignkey: string;
+    // eslint-disable-next-line camelcase
+    fk_partno: number;
+    foreignkeycolumn: string;
+    tablereferenced: string;
+    schemareferenced: string;
+    foreignkeycolumnreferenced: string;
+    ondelete: "RESTRICT" | "CASCADE" | "SET NULL" | "NO ACTION";
+    onupdate: "RESTRICT" | "CASCADE" | "SET NULL" | "NO ACTION"; // eslint-disable-next-line camelcase
+    object_id: string; // Distinct because of note in https://www.postgresql.org/docs/9.1/information-schema.html
+}
+
 export default class PostgresDriver extends AbstractDriver {
     public defaultValues: DataTypeDefaults = new TypeormDriver.PostgresDriver({
         options: { replication: undefined } as ConnectionOptions,
@@ -57,19 +106,17 @@ export default class PostgresDriver extends AbstractDriver {
         schemas: string[],
         dbNames: string[]
     ): Promise<Entity[]> {
-        const response: {
-            TABLE_SCHEMA: string;
-            TABLE_NAME: string;
-            DB_NAME: string;
-        }[] = (
-            await this.Connection.query(`SELECT table_schema  AS TABLE_SCHEMA,
-                                                   table_name    AS TABLE_NAME,
-                                                   table_catalog AS DB_NAME
-                                            FROM INFORMATION_SCHEMA.TABLES
-                                            WHERE TABLE_TYPE = 'BASE TABLE'
-                                              AND table_schema IN (${PostgresDriver.buildEscapedObjectList(
-                                                  schemas
-                                              )})`)
+        const response: GetAllTablesResponse[] = (
+            await this.Connection.query(`
+                SELECT table_schema  AS table_schema,
+                       table_name    AS table_name,
+                       table_catalog AS db_name
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_TYPE = 'BASE TABLE'
+                  AND table_schema IN (${PostgresDriver.buildEscapedObjectList(
+                      schemas
+                  )})
+            `)
         ).rows;
         const ret: Entity[] = [];
         response.forEach((val) => {
@@ -78,11 +125,11 @@ export default class PostgresDriver extends AbstractDriver {
                 indices: [],
                 relations: [],
                 relationIds: [],
-                sqlName: val.TABLE_NAME,
-                tscName: val.TABLE_NAME,
-                fileName: val.TABLE_NAME,
-                database: dbNames.length > 1 ? val.DB_NAME : "",
-                schema: val.TABLE_SCHEMA,
+                sqlName: val.table_name,
+                tscName: val.table_name,
+                fileName: val.table_name,
+                database: dbNames.length > 1 ? val.db_name : "",
+                schema: val.table_schema,
                 fileImports: [],
             });
         });
@@ -93,58 +140,49 @@ export default class PostgresDriver extends AbstractDriver {
         entities: Entity[],
         schemas: string[]
     ): Promise<Entity[]> {
-        const response: {
-            /* eslint-disable camelcase */
-            table_name: string;
-            column_name: string;
-            udt_name: string;
-            column_default: string;
-            is_nullable: string;
-            data_type: string;
-            character_maximum_length: number;
-            numeric_precision: number;
-            numeric_scale: number;
-            isidentity: string; // SERIAL identity type
-            is_identity: string; // reccommended INDENTITY type for pg > 10
-            isunique: string;
-            enumvalues: string | null /* eslint-enable camelcase */;
-        }[] = (
-            await this.Connection.query(`SELECT table_name,
-                               column_name,
-                               udt_name,
-                               column_default,
-                               is_nullable,
-                               data_type,
-                               character_maximum_length,
-                               numeric_precision,
-                               numeric_scale,
-                               CASE WHEN column_default LIKE 'nextval%' THEN 'YES' ELSE 'NO' END isidentity,
-                               is_identity,
-                               (SELECT COUNT(*)
-                                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-                                         INNER JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cu
-                                                    ON cu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
-                                WHERE tc.CONSTRAINT_TYPE = 'UNIQUE'
-                                  AND tc.TABLE_NAME = c.TABLE_NAME
-                                  AND cu.COLUMN_NAME = c.COLUMN_NAME
-                                  AND tc.TABLE_SCHEMA = c.TABLE_SCHEMA)                          IsUnique,
-                               (SELECT STRING_AGG(enumlabel, ',')
-                                FROM pg_enum e
-                                         INNER JOIN pg_type t ON t.oid = e.enumtypid
-                                         INNER JOIN pg_namespace n ON n.oid = t.typnamespace
-                                WHERE n.nspname = table_schema
-                                  AND t.typname = udt_name
-                               )                                                                 enumValues
-                        FROM INFORMATION_SCHEMA.COLUMNS c
-                        WHERE table_schema IN (${PostgresDriver.buildEscapedObjectList(
-                            schemas
-                        )})
-                        ORDER BY
-                            ordinal_position`)
+        const response: GetCoulmnsFromEntityResponse[] = (
+            await this.Connection.query(`SELECT table_schema,
+                                                                                              table_name,
+                                                                                              column_name,
+                                                                                              udt_name,
+                                                                                              column_default,
+                                                                                              is_nullable,
+                                                                                              data_type,
+                                                                                              character_maximum_length,
+                                                                                              numeric_precision,
+                                                                                              numeric_scale,
+                                                                                              CASE WHEN column_default LIKE 'nextval%' THEN 'YES' ELSE 'NO' END isidentity,
+                                                                                              is_identity,
+                                                                                              (SELECT COUNT(*)
+                                                                                               FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                                                                                                        INNER JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cu
+                                                                                                                   ON cu.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+                                                                                               WHERE tc.CONSTRAINT_TYPE = 'UNIQUE'
+                                                                                                 AND tc.table_name = c.table_name
+                                                                                                 AND cu.COLUMN_NAME = c.COLUMN_NAME
+                                                                                                 AND tc.table_schema = c.table_schema)                          IsUnique,
+                                                                                              (SELECT STRING_AGG(enumlabel, ',')
+                                                                                               FROM pg_enum e
+                                                                                                        INNER JOIN pg_type t ON t.oid = e.enumtypid
+                                                                                                        INNER JOIN pg_namespace n ON n.oid = t.typnamespace
+                                                                                               WHERE n.nspname = table_schema
+                                                                                                 AND t.typname = udt_name
+                                                                                              )                                                                 enumValues
+                                                                                       FROM INFORMATION_SCHEMA.COLUMNS c
+                                                                                       WHERE table_schema IN (${PostgresDriver.buildEscapedObjectList(
+                                                                                           schemas
+                                                                                       )})
+                                                                                       ORDER BY
+                                                                                           ordinal_position`)
         ).rows;
         entities.forEach((ent) => {
             response
-                .filter((filterVal) => filterVal.table_name === ent.tscName)
+                .filter((filterVal) => {
+                    return (
+                        filterVal.table_name === ent.tscName &&
+                        filterVal.table_schema === ent.schema
+                    );
+                })
                 .forEach((resp) => {
                     const tscName = resp.column_name;
                     const options: Column["options"] = {
@@ -479,42 +517,42 @@ export default class PostgresDriver extends AbstractDriver {
         entities: Entity[],
         schemas: string[]
     ): Promise<Entity[]> {
-        const response: {
-            tablename: string;
-            indexname: string;
-            columnname: string; // eslint-disable-next-line camelcase
-            is_unique: number; // eslint-disable-next-line camelcase
-            is_primary_key: number;
-        }[] = (
+        const response: GetIndexesFromEntityResponse[] = (
             await this.Connection.query(`SELECT c.relname AS tablename,
-                                                   i.relname AS indexname,
-                                                   f.attname AS columnname,
-                                                   CASE
-                                                       WHEN ix.indisunique = TRUE THEN 1
-                                                       ELSE 0
-                                                   END       AS is_unique,
-                                                   CASE
-                                                       WHEN ix.indisprimary = 'true' THEN 1
-                                                       ELSE 0
-                                                   END       AS is_primary_key
-                                            FROM pg_attribute f
-                                                     JOIN pg_class c ON c.oid = f.attrelid
-                                                     JOIN pg_type t ON t.oid = f.atttypid
-                                                     LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = f.attnum
-                                                     LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-                                                     LEFT JOIN pg_index AS ix
-                                                               ON f.attnum = ANY (ix.indkey) AND c.oid = f.attrelid AND
-                                                                  c.oid = ix.indrelid
-                                                     LEFT JOIN pg_class AS i ON ix.indexrelid = i.oid
-                                            WHERE c.relkind = 'r'::char
-                                              AND n.nspname IN (${PostgresDriver.buildEscapedObjectList(
-                                                  schemas
-                                              )})
-                                              AND f.attnum > 0
-                                              AND i.oid <> 0
-                                            ORDER BY
-                                                c.relname,
-                                                f.attname;`)
+                                                                                              i.relname AS indexname,
+                                                                                              f.attname AS columnname,
+                                                                                              CASE
+                                                                                                  WHEN ix.indisunique = TRUE
+                                                                                                      THEN 1
+                                                                                                  ELSE 0
+                                                                                              END       AS is_unique,
+                                                                                              CASE
+                                                                                                  WHEN ix.indisprimary = 'true'
+                                                                                                      THEN 1
+                                                                                                  ELSE 0
+                                                                                              END       AS is_primary_key
+                                                                                       FROM pg_attribute f
+                                                                                                JOIN pg_class c ON c.oid = f.attrelid
+                                                                                                JOIN pg_type t ON t.oid = f.atttypid
+                                                                                                LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = f.attnum
+                                                                                                LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+                                                                                                LEFT JOIN pg_index AS ix
+                                                                                                          ON f.attnum = ANY
+                                                                                                             (ix.indkey) AND
+                                                                                                             c.oid =
+                                                                                                             f.attrelid AND
+                                                                                                             c.oid =
+                                                                                                             ix.indrelid
+                                                                                                LEFT JOIN pg_class AS i ON ix.indexrelid = i.oid
+                                                                                       WHERE c.relkind = 'r'::char
+                                                                                         AND n.nspname IN (${PostgresDriver.buildEscapedObjectList(
+                                                                                             schemas
+                                                                                         )})
+                                                                                         AND f.attnum > 0
+                                                                                         AND i.oid <> 0
+                                                                                       ORDER BY
+                                                                                           c.relname,
+                                                                                           f.attname;`)
         ).rows;
         entities.forEach((ent) => {
             const entityIndices = response.filter(
@@ -548,55 +586,53 @@ export default class PostgresDriver extends AbstractDriver {
         dbNames: string[],
         generationOptions: IGenerationOptions
     ): Promise<Entity[]> {
-        const response: {
-            tablewithforeignkey: string; // eslint-disable-next-line camelcase
-            fk_partno: number;
-            foreignkeycolumn: string;
-            tablereferenced: string;
-            foreignkeycolumnreferenced: string;
-            ondelete: "RESTRICT" | "CASCADE" | "SET NULL" | "NO ACTION";
-            onupdate: "RESTRICT" | "CASCADE" | "SET NULL" | "NO ACTION"; // eslint-disable-next-line camelcase
-            object_id: string; // Distinct because of note in https://www.postgresql.org/docs/9.1/information-schema.html
-        }[] = (
-            await this.Connection
-                .query(`SELECT DISTINCT con.relname                                      AS tablewithforeignkey,
-                                                            att.attnum                                       AS fk_partno,
-                                                            att2.attname                                     AS foreignkeycolumn,
-                                                            cl.relname                                       AS tablereferenced,
-                                                            att.attname                                      AS foreignkeycolumnreferenced,
-                                                            delete_rule                                      AS ondelete,
-                                                            update_rule                                      AS onupdate,
-                                                            CONCAT(con.conname, con.conrelid, con.confrelid) AS object_id
-                                            FROM (
-                                                     SELECT UNNEST(con1.conkey)  AS parent,
-                                                            UNNEST(con1.confkey) AS child,
-                                                            con1.confrelid,
-                                                            con1.conrelid,
-                                                            cl_1.relname,
-                                                            con1.conname,
-                                                            nspname
-                                                     FROM pg_class cl_1,
-                                                          pg_namespace ns,
-                                                          pg_constraint con1
-                                                     WHERE con1.contype = 'f'::char
-                                                       AND cl_1.relnamespace = ns.oid
-                                                       AND con1.conrelid = cl_1.oid
-                                                       AND nspname IN (${PostgresDriver.buildEscapedObjectList(
-                                                           schemas
-                                                       )})
-                                                 ) con,
-                                                 pg_attribute att,
-                                                 pg_class cl,
-                                                 pg_attribute att2,
-                                                 information_schema.referential_constraints rc
-                                            WHERE att.attrelid = con.confrelid
-                                              AND att.attnum = con.child
-                                              AND cl.oid = con.confrelid
-                                              AND att2.attrelid = con.conrelid
-                                              AND att2.attnum = con.parent
-                                              AND rc.constraint_name = con.conname
-                                              AND constraint_catalog = CURRENT_DATABASE()
-                                              AND rc.constraint_schema = nspname
+        const response: GetRelationsResponse[] = (
+            await this.Connection.query(`
+                SELECT DISTINCT con.relname                                                   AS tablewithforeignkey,
+                                con.nspname                                                   AS schemawithforeignkey,
+                                att.attnum                                                    AS fk_partno,
+                                att2.attname                                                  AS foreignkeycolumn,
+                                cl.relname                                                    AS tablereferenced,
+                                ns.nspname                                                    AS schemareferenced,
+                                att.attname                                                   AS foreignkeycolumnreferenced,
+                                delete_rule                                                   AS ondelete,
+                                update_rule                                                   AS onupdate,
+                                CONCAT(con.nspname, con.conname, con.conrelid, con.confrelid) AS object_id
+                FROM (
+                         SELECT UNNEST(con1.conkey)  AS parent,
+                                UNNEST(con1.confkey) AS child,
+                                con1.confrelid,
+                                con1.conrelid,
+                                cl_1.relname,
+                                con1.conname,
+                                nspname
+                         FROM pg_class cl_1,
+                              pg_namespace ns,
+                              pg_constraint con1
+                         WHERE con1.contype = 'f'::char
+                           AND cl_1.relnamespace = ns.oid
+                           AND con1.conrelid = cl_1.oid
+                           AND nspname IN (${PostgresDriver.buildEscapedObjectList(
+                               schemas
+                           )})
+                     ) con
+                         INNER JOIN pg_attribute att
+                                    ON att.attrelid = con.confrelid
+                                        AND att.attnum = con.child
+                         INNER JOIN pg_class AS cl
+                                    ON cl.oid = con.confrelid
+                         INNER JOIN pg_namespace AS ns
+                                    ON cl.relnamespace = ns.oid
+                         INNER JOIN pg_attribute AS att2
+                                    ON att2.attrelid = con.conrelid
+                                        AND att2.attnum = con.parent
+                         INNER JOIN information_schema.referential_constraints AS rc
+                                    ON rc.constraint_name = con.conname
+                                        AND rc.constraint_schema = con.nspname
+                WHERE constraint_catalog = CURRENT_DATABASE()
+                  AND ns.nspname IN (${PostgresDriver.buildEscapedObjectList(
+                      schemas
+                  )})
             `)
         ).rows;
 
@@ -604,13 +640,21 @@ export default class PostgresDriver extends AbstractDriver {
         const relationKeys = new Set(response.map((v) => v.object_id));
 
         relationKeys.forEach((relationId) => {
-            const rows = response.filter((v) => v.object_id === relationId);
-            const ownerTable = entities.find(
-                (v) => v.sqlName === rows[0].tablewithforeignkey
-            );
-            const relatedTable = entities.find(
-                (v) => v.sqlName === rows[0].tablereferenced
-            );
+            const rows = response.filter((v) => {
+                return v.object_id === relationId;
+            });
+            const ownerTable = entities.find((v) => {
+                return (
+                    v.sqlName === rows[0].tablewithforeignkey &&
+                    v.schema === rows[0].schemawithforeignkey
+                );
+            });
+            const relatedTable = entities.find((v) => {
+                return (
+                    v.sqlName === rows[0].tablereferenced &&
+                    v.schema === rows[0].schemareferenced
+                );
+            });
             if (!ownerTable || !relatedTable) {
                 TomgUtils.LogError(
                     `Relation between tables ${rows[0].tablewithforeignkey} and ${rows[0].tablereferenced} wasn't found in entity model.`,
@@ -703,9 +747,9 @@ export default class PostgresDriver extends AbstractDriver {
     }
 
     public async CheckIfDBExists(dbName: string): Promise<boolean> {
-        const resp = await this.Connection.query(
-            `SELECT datname FROM pg_database  WHERE datname  ='${dbName}' `
-        );
+        const resp = await this.Connection.query(`SELECT datname
+                                                  FROM pg_database
+                                                  WHERE datname = '${dbName}' `);
         return resp.rowCount > 0;
     }
 }
