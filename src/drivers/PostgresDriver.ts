@@ -39,6 +39,7 @@ export interface GetCoulmnsFromEntityResponse {
 }
 
 export interface GetIndexesFromEntityResponse {
+    schemaname: string;
     tablename: string;
     indexname: string;
     columnname: string; // eslint-disable-next-line camelcase
@@ -518,46 +519,51 @@ export default class PostgresDriver extends AbstractDriver {
         schemas: string[]
     ): Promise<Entity[]> {
         const response: GetIndexesFromEntityResponse[] = (
-            await this.Connection.query(`SELECT c.relname AS tablename,
-                                                                                              i.relname AS indexname,
-                                                                                              f.attname AS columnname,
-                                                                                              CASE
-                                                                                                  WHEN ix.indisunique = TRUE
-                                                                                                      THEN 1
-                                                                                                  ELSE 0
-                                                                                              END       AS is_unique,
-                                                                                              CASE
-                                                                                                  WHEN ix.indisprimary = 'true'
-                                                                                                      THEN 1
-                                                                                                  ELSE 0
-                                                                                              END       AS is_primary_key
-                                                                                       FROM pg_attribute f
-                                                                                                JOIN pg_class c ON c.oid = f.attrelid
-                                                                                                JOIN pg_type t ON t.oid = f.atttypid
-                                                                                                LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = f.attnum
-                                                                                                LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-                                                                                                LEFT JOIN pg_index AS ix
-                                                                                                          ON f.attnum = ANY
-                                                                                                             (ix.indkey) AND
-                                                                                                             c.oid =
-                                                                                                             f.attrelid AND
-                                                                                                             c.oid =
-                                                                                                             ix.indrelid
-                                                                                                LEFT JOIN pg_class AS i ON ix.indexrelid = i.oid
-                                                                                       WHERE c.relkind = 'r'::char
-                                                                                         AND n.nspname IN (${PostgresDriver.buildEscapedObjectList(
-                                                                                             schemas
-                                                                                         )})
-                                                                                         AND f.attnum > 0
-                                                                                         AND i.oid <> 0
-                                                                                       ORDER BY
-                                                                                           c.relname,
-                                                                                           f.attname;`)
+            await this.Connection.query(`
+                SELECT n.nspname AS schemaname,
+                       c.relname AS tablename,
+                       i.relname AS indexname,
+                       f.attname AS columnname,
+                       CASE
+                           WHEN ix.indisunique = TRUE
+                               THEN 1
+                           ELSE 0
+                       END       AS is_unique,
+                       CASE
+                           WHEN ix.indisprimary = 'true'
+                               THEN 1
+                           ELSE 0
+                       END       AS is_primary_key
+                FROM pg_attribute f
+                         JOIN pg_class c ON c.oid = f.attrelid
+                         JOIN pg_type t ON t.oid = f.atttypid
+                         LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = f.attnum
+                         LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+                         LEFT JOIN pg_index AS ix
+                                   ON f.attnum = ANY
+                                      (ix.indkey) AND
+                                      c.oid =
+                                      f.attrelid AND
+                                      c.oid =
+                                      ix.indrelid
+                         LEFT JOIN pg_class AS i ON ix.indexrelid = i.oid
+                WHERE c.relkind = 'r'::char
+                  AND n.nspname IN (${PostgresDriver.buildEscapedObjectList(
+                      schemas
+                  )})
+                  AND f.attnum > 0
+                  AND i.oid <> 0
+                ORDER BY
+                    c.relname,
+                    f.attname;`)
         ).rows;
         entities.forEach((ent) => {
-            const entityIndices = response.filter(
-                (filterVal) => filterVal.tablename === ent.tscName
-            );
+            const entityIndices = response.filter((filterVal) => {
+                return (
+                    filterVal.tablename === ent.tscName &&
+                    filterVal.schemaname === ent.schema
+                );
+            });
             const indexNames = new Set(entityIndices.map((v) => v.indexname));
             indexNames.forEach((indexName) => {
                 const records = entityIndices.filter(
