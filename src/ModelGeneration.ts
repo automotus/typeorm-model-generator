@@ -75,6 +75,15 @@ function generateModels(
             default:
                 throw new Error("Unknown case style");
         }
+        element.indices.sort((indexA, indexB) => {
+            if (indexA.name < indexB.name) {
+                return -1;
+            }
+            if (indexA.name > indexB.name) {
+                return 1;
+            }
+            return 0;
+        });
         const resultFilePath = path.resolve(
             entitiesPath,
             `${casedFileName}.ts`
